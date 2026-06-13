@@ -21,6 +21,16 @@ final class TerminalSurface: NSObject, LocalProcessTerminalViewDelegate {
         )
     }
 
+    func restart() {
+        if view.process.running {
+            // terminate() sends SIGTERM and calls childStopped(); the processTerminated
+            // delegate fires next, which re-spawns via start() on the main queue.
+            view.process.terminate()
+        } else {
+            start()
+        }
+    }
+
     func apply(_ settings: Settings) {
         if let font = NSFont(name: settings.fontName, size: CGFloat(settings.fontSize)) {
             view.font = font

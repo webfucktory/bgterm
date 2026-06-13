@@ -14,9 +14,14 @@ final class AppCoordinator: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         settings = Settings(store: defaults)
-        guard let screen = NSScreen.main else { return }
+        guard let screen = NSScreen.main else {
+            tray.install(enabled: false)
+            tray.showError("no display found")
+            return
+        }
 
         window = DesktopWindow(screen: screen)
+        window.delegate = self
         surface = TerminalSurface(frame: screen.frame)
         surface.apply(settings)
         window.contentView = surface.view
@@ -59,7 +64,7 @@ final class AppCoordinator: NSObject, NSApplicationDelegate {
             var s = self.settings!; s.opacity = value; self.settings = s
             self.surface.apply(s)
         }
-        tray.onRestartShell = { [weak self] in self?.surface.start() }
+        tray.onRestartShell = { [weak self] in self?.surface.restart() }
         tray.onQuit = { NSApp.terminate(nil) }
         tray.install(enabled: settings.enabledOnLaunch)
     }
@@ -77,6 +82,14 @@ final class AppCoordinator: NSObject, NSApplicationDelegate {
     @objc private func screensChanged() {
         guard let screen = NSScreen.main else { return }
         window.setFrame(screen.frame, display: true)
+    }
+}
+
+// MARK: - NSWindowDelegate
+
+extension AppCoordinator: NSWindowDelegate {
+    func windowDidResignKey(_ notification: Notification) {
+        reveal?.escapePressed()
     }
 }
 
