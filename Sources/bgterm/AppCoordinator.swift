@@ -3,14 +3,15 @@ import BgtermCore
 
 final class AppCoordinator: NSObject, NSApplicationDelegate {
     private let defaults = UserDefaultsStore()
+    private let ownPID = ProcessInfo.processInfo.processIdentifier
     private var settings: Settings!
     private var window: DesktopWindow!
     private var surface: TerminalSurface!
     private var reveal: RevealController!
-    private var monitor: DesktopVisibilityMonitor!
     private var hotkey: HotkeyManager!
     private let tray = TrayController()
     private var escMonitor: Any?
+    private var focusEnabled = true
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         settings = Settings(store: defaults)
@@ -21,7 +22,6 @@ final class AppCoordinator: NSObject, NSApplicationDelegate {
         }
 
         window = DesktopWindow(screen: screen)
-        window.delegate = self
         surface = TerminalSurface(frame: NSRect(origin: .zero, size: window.frame.size))
         surface.apply(settings)
         window.contentView = surface.container
@@ -30,23 +30,25 @@ final class AppCoordinator: NSObject, NSApplicationDelegate {
         window.orderFront(nil)
         surface.start()
 
-        reveal = RevealController(window: WindowController(window: window))
-
-        monitor = DesktopVisibilityMonitor()
-        monitor.onSample = { [weak self] visible in self?.reveal.sampleDesktopVisible(visible) }
-        monitor.start()
+        reveal = RevealController(window: WindowController(window: window, focusView: surface.view))
 
         hotkey = HotkeyManager()
-        hotkey.onTrigger = { [weak self] in self?.reveal.forceFocus() }
+        hotkey.onTrigger = { [weak self] in self?.toggleViaHotkey() }
         hotkey.register()
 
         installTray()
         installEscMonitor()
 
+        focusEnabled = settings.enabledOnLaunch
         if !settings.enabledOnLaunch {
             window.orderOut(nil)
-            monitor.stop()
         }
+
+        // Show Desktop posts no app-level signal, so it can't be auto-detected;
+        // clicking the desktop activates Finder, which we can observe to focus.
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self, selector: #selector(appActivated(_:)),
+            name: NSWorkspace.didActivateApplicationNotification, object: nil)
 
         NotificationCenter.default.addObserver(
             self, selector: #selector(screensChanged),
@@ -56,8 +58,13 @@ final class AppCoordinator: NSObject, NSApplicationDelegate {
     private func installTray() {
         tray.onToggleEnabled = { [weak self] enabled in
             guard let self else { return }
-            if enabled { self.window.orderFront(nil); self.monitor.start() }
-            else { self.window.orderOut(nil); self.monitor.stop() }
+            self.focusEnabled = enabled
+            if enabled {
+                self.window.orderFront(nil)
+            } else {
+                self.reveal.escapePressed()
+                self.window.orderOut(nil)
+            }
             var s = self.settings!; s.enabledOnLaunch = enabled; self.settings = s
         }
         tray.onSetOpacity = { [weak self] value in
@@ -70,27 +77,50 @@ final class AppCoordinator: NSObject, NSApplicationDelegate {
         tray.install(enabled: settings.enabledOnLaunch)
     }
 
+    /// ⌥⌘T: reveal the desktop and focus the terminal, or restore windows and
+    /// release focus if already focused.
+    private func toggleViaHotkey() {
+        guard focusEnabled else { return }
+        if reveal.state == .focused {
+            reveal.escapePressed()
+            ShowDesktop.toggle()   // restore the windows that were moved aside
+        } else {
+            ShowDesktop.toggle()   // slide windows aside to reveal the desktop
+            reveal.forceFocus()
+        }
+    }
+
     private func installEscMonitor() {
         escMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            if event.keyCode == 53 { // Esc
-                self?.reveal.escapePressed()
+            guard let self else { return event }
+            if event.keyCode == 53, self.reveal.state == .focused { // Esc while focused
+                self.reveal.escapePressed()
+                ShowDesktop.toggle()   // restore windows
                 return nil
             }
             return event
         }
     }
 
+    /// Drive focus from the active application: focus the terminal when the user
+    /// goes to the desktop (Finder becomes active), and release it when any other
+    /// app becomes active. Centralising both directions here avoids racing a
+    /// window resign-key handler.
+    @objc private func appActivated(_ note: Notification) {
+        guard focusEnabled,
+              let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+              app.processIdentifier != ownPID
+        else { return }
+        if app.bundleIdentifier == "com.apple.finder" {
+            reveal.forceFocus()
+        } else {
+            reveal.escapePressed()
+        }
+    }
+
     @objc private func screensChanged() {
         guard let screen = NSScreen.main else { return }
         window.setFrame(DesktopWindow.wallpaperRect(for: screen), display: true)
-    }
-}
-
-// MARK: - NSWindowDelegate
-
-extension AppCoordinator: NSWindowDelegate {
-    func windowDidResignKey(_ notification: Notification) {
-        reveal?.escapePressed()
     }
 }
 

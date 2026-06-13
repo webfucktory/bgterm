@@ -44,9 +44,12 @@ final class DesktopWindow: NSWindow {
     }
 
     func raiseAndFocus() {
-        level = .normal
+        // Stay at desktop level (behind icons) but become the key window so it
+        // receives keyboard input. Pairs with Show Desktop, which clears the
+        // covering windows so the terminal is visible while focused.
         ignoresMouseEvents = false
         NSApp.activate(ignoringOtherApps: true)
         makeKeyAndOrderFront(nil)
+        level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.desktopWindow)))
     }
 }
