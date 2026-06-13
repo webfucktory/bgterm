@@ -3,7 +3,6 @@ import BgtermCore
 
 final class AppCoordinator: NSObject, NSApplicationDelegate {
     private let defaults = UserDefaultsStore()
-    private let ownPID = ProcessInfo.processInfo.processIdentifier
     private var settings: Settings!
     private var window: DesktopWindow!
     private var tabs: TerminalTabs!
@@ -47,12 +46,6 @@ final class AppCoordinator: NSObject, NSApplicationDelegate {
         NotificationCenter.default.addObserver(
             self, selector: #selector(screensChanged),
             name: NSApplication.didChangeScreenParametersNotification, object: nil)
-
-        // Clicking the desktop activates Finder — focus the terminal then;
-        // release it when any other app becomes active.
-        NSWorkspace.shared.notificationCenter.addObserver(
-            self, selector: #selector(appActivated(_:)),
-            name: NSWorkspace.didActivateApplicationNotification, object: nil)
     }
 
     private func installTray() {
@@ -130,18 +123,6 @@ final class AppCoordinator: NSObject, NSApplicationDelegate {
         let opaque = settings.opacity >= 1.0
         window.isOpaque = opaque
         window.backgroundColor = opaque ? .black : .clear
-    }
-
-    @objc private func appActivated(_ note: Notification) {
-        guard focusEnabled,
-              let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
-              app.processIdentifier != ownPID
-        else { return }
-        if app.bundleIdentifier == "com.apple.finder" {
-            reveal.forceFocus()
-        } else {
-            reveal.escapePressed()
-        }
     }
 
     @objc private func screensChanged() {
