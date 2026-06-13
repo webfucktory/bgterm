@@ -33,7 +33,7 @@ final class AppCoordinator: NSObject, NSApplicationDelegate {
 
         hotkey = HotkeyManager()
         hotkey.onTrigger = { [weak self] in self?.toggleViaHotkey() }
-        hotkey.register()
+        registerHotkey()
 
         installTray()
         installEscMonitor()
@@ -68,7 +68,21 @@ final class AppCoordinator: NSObject, NSApplicationDelegate {
         }
         tray.onRestartShell = { [weak self] in self?.tabs.restartActive() }
         tray.onQuit = { NSApp.terminate(nil) }
+        tray.hotkeyNames = HotkeyManager.options.map { $0.name }
+        tray.selectedHotkey = settings.hotkeyIndex
+        tray.onSelectHotkey = { [weak self] i in
+            guard let self else { return }
+            var s = self.settings!; s.hotkeyIndex = i; self.settings = s
+            self.registerHotkey()
+        }
         tray.install(enabled: settings.enabledOnLaunch)
+    }
+
+    private func registerHotkey() {
+        let opts = HotkeyManager.options
+        let opt = opts[min(max(0, settings.hotkeyIndex), opts.count - 1)]
+        hotkey.unregister()
+        hotkey.register(keyCode: opt.keyCode, modifiers: opt.modifiers)
     }
 
     /// ⌥⌘T: bring the terminal to the front and focus it, or send it back to the

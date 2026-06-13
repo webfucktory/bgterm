@@ -39,4 +39,10 @@ public struct Settings {
         get { store.bool(forKey: "enabledOnLaunch") ?? true }
         set { store.set(newValue, forKey: "enabledOnLaunch") }
     }
+
+    /// Index into the available reveal-hotkey presets.
+    public var hotkeyIndex: Int {
+        get { store.integer(forKey: "hotkeyIndex") ?? 0 }
+        set { store.set(max(0, newValue), forKey: "hotkeyIndex") }
+    }
 }

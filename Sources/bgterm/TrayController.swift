@@ -8,6 +8,11 @@ final class TrayController: NSObject {
     var onSetOpacity: ((Double) -> Void)?
     var onRestartShell: (() -> Void)?
     var onQuit: (() -> Void)?
+    var onSelectHotkey: ((Int) -> Void)?
+
+    /// Reveal-hotkey preset names and the selected index (set before install()).
+    var hotkeyNames: [String] = []
+    var selectedHotkey = 0
 
     private var enabled = true
 
@@ -37,6 +42,21 @@ final class TrayController: NSObject {
         menu.addItem(opacityItem(1.0))
         menu.addItem(.separator())
 
+        if !hotkeyNames.isEmpty {
+            let hotkeyItem = NSMenuItem(title: "Reveal hotkey", action: nil, keyEquivalent: "")
+            let submenu = NSMenu()
+            for (i, name) in hotkeyNames.enumerated() {
+                let item = NSMenuItem(title: name, action: #selector(setHotkey(_:)), keyEquivalent: "")
+                item.target = self
+                item.representedObject = i
+                item.state = (i == selectedHotkey) ? .on : .off
+                submenu.addItem(item)
+            }
+            hotkeyItem.submenu = submenu
+            menu.addItem(hotkeyItem)
+            menu.addItem(.separator())
+        }
+
         let restart = NSMenuItem(title: "Restart shell",
                                  action: #selector(restart), keyEquivalent: "")
         restart.target = self
@@ -65,6 +85,14 @@ final class TrayController: NSObject {
 
     @objc private func setOpacity(_ sender: NSMenuItem) {
         if let value = sender.representedObject as? Double { onSetOpacity?(value) }
+    }
+
+    @objc private func setHotkey(_ sender: NSMenuItem) {
+        if let i = sender.representedObject as? Int {
+            selectedHotkey = i
+            onSelectHotkey?(i)
+            rebuildMenu()
+        }
     }
 
     @objc private func restart() { onRestartShell?() }

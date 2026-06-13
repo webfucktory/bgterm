@@ -3,6 +3,22 @@ import Carbon.HIToolbox
 
 /// Registers a single global hotkey via the Carbon Events API.
 final class HotkeyManager {
+    /// A selectable reveal-hotkey preset.
+    struct Option {
+        let name: String
+        let keyCode: UInt32
+        let modifiers: UInt32
+    }
+
+    /// Presets offered in the tray menu (index persisted as Settings.hotkeyIndex).
+    static let options: [Option] = [
+        Option(name: "⌥⌘T", keyCode: UInt32(kVK_ANSI_T), modifiers: UInt32(optionKey | cmdKey)),
+        Option(name: "⌃⌘T", keyCode: UInt32(kVK_ANSI_T), modifiers: UInt32(controlKey | cmdKey)),
+        Option(name: "⌥⌘`", keyCode: UInt32(kVK_ANSI_Grave), modifiers: UInt32(optionKey | cmdKey)),
+        Option(name: "⌥⌘Return", keyCode: UInt32(kVK_Return), modifiers: UInt32(optionKey | cmdKey)),
+        Option(name: "⌃⌘Space", keyCode: UInt32(kVK_Space), modifiers: UInt32(controlKey | cmdKey)),
+    ]
+
     private var hotKeyRef: EventHotKeyRef?
     private var handlerRef: EventHandlerRef?
     var onTrigger: (() -> Void)?
