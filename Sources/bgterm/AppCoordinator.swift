@@ -42,8 +42,12 @@ final class AppCoordinator: NSObject, NSApplicationDelegate {
         keyTap.onKeyDown = { [weak self] code in
             if code == 0x67 { self?.f11Pressed() }   // F11
         }
-        KeyTap.requestAccess()
-        keyTap.start()
+        if KeyTap.isTrusted {
+            keyTap.start()
+        } else if !UserDefaults.standard.bool(forKey: "didPromptAccessibility") {
+            UserDefaults.standard.set(true, forKey: "didPromptAccessibility")
+            KeyTap.requestAccess()   // prompt at most once, then never nag again
+        }
 
         installTray()
         installEscMonitor()
