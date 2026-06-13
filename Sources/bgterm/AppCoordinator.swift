@@ -3,7 +3,6 @@ import BgtermCore
 
 final class AppCoordinator: NSObject, NSApplicationDelegate {
     private let defaults = UserDefaultsStore()
-    private let ownPID = ProcessInfo.processInfo.processIdentifier
     private var settings: Settings!
     private var window: DesktopWindow!
     private var surface: TerminalSurface!
@@ -43,12 +42,6 @@ final class AppCoordinator: NSObject, NSApplicationDelegate {
         if !settings.enabledOnLaunch {
             window.orderOut(nil)
         }
-
-        // Show Desktop posts no app-level signal, so it can't be auto-detected;
-        // clicking the desktop activates Finder, which we can observe to focus.
-        NSWorkspace.shared.notificationCenter.addObserver(
-            self, selector: #selector(appActivated(_:)),
-            name: NSWorkspace.didActivateApplicationNotification, object: nil)
 
         NotificationCenter.default.addObserver(
             self, selector: #selector(screensChanged),
@@ -99,22 +92,6 @@ final class AppCoordinator: NSObject, NSApplicationDelegate {
                 return nil
             }
             return event
-        }
-    }
-
-    /// Drive focus from the active application: focus the terminal when the user
-    /// goes to the desktop (Finder becomes active), and release it when any other
-    /// app becomes active. Centralising both directions here avoids racing a
-    /// window resign-key handler.
-    @objc private func appActivated(_ note: Notification) {
-        guard focusEnabled,
-              let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
-              app.processIdentifier != ownPID
-        else { return }
-        if app.bundleIdentifier == "com.apple.finder" {
-            reveal.forceFocus()
-        } else {
-            reveal.escapePressed()
         }
     }
 
