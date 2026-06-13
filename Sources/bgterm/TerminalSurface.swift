@@ -2,15 +2,40 @@ import AppKit
 import SwiftTerm
 import BgtermCore
 
+/// Terminal view that declares itself opaque. SwiftTerm leaves NSView.isOpaque
+/// at its default (false); declaring it opaque keeps the layer-backed content
+/// compositing cleanly in the borderless desktop-level window.
+final class OpaqueTerminalView: LocalProcessTerminalView {
+    override var isOpaque: Bool { true }
+}
+
 /// Owns the interactive terminal view and applies appearance settings.
+///
+/// The terminal is inset inside an opaque black `container` so its text has
+/// breathing room from the screen edges; `container` is what the window hosts.
 final class TerminalSurface: NSObject, LocalProcessTerminalViewDelegate {
-    let view: LocalProcessTerminalView
+    let container: NSView
+    let view: OpaqueTerminalView
+
+    /// Padding between the screen edges and the terminal text.
+    private let inset = NSEdgeInsets(top: 28, left: 32, bottom: 28, right: 32)
 
     init(frame: NSRect) {
-        view = LocalProcessTerminalView(frame: frame)
+        container = NSView(frame: frame)
+        container.wantsLayer = true
+        container.layer?.backgroundColor = NSColor.black.cgColor
+        view = OpaqueTerminalView(frame: TerminalSurface.contentFrame(in: frame, inset: inset))
         super.init()
         view.processDelegate = self
         view.autoresizingMask = [.width, .height]
+        container.addSubview(view)
+    }
+
+    private static func contentFrame(in bounds: NSRect, inset: NSEdgeInsets) -> NSRect {
+        NSRect(x: bounds.minX + inset.left,
+               y: bounds.minY + inset.bottom,
+               width: max(0, bounds.width - inset.left - inset.right),
+               height: max(0, bounds.height - inset.top - inset.bottom))
     }
 
     func start() {
@@ -32,14 +57,11 @@ final class TerminalSurface: NSObject, LocalProcessTerminalViewDelegate {
     }
 
     func apply(_ settings: Settings) {
-        if let font = NSFont(name: settings.fontName, size: CGFloat(settings.fontSize)) {
-            view.font = font
-        }
+        let size = CGFloat(settings.fontSize)
+        view.font = NSFont(name: settings.fontName, size: size)
+            ?? .monospacedSystemFont(ofSize: size, weight: .regular)
         view.nativeForegroundColor = .white
-        let bgAlpha = CGFloat(settings.opacity)
-        view.nativeBackgroundColor = NSColor.black.withAlphaComponent(bgAlpha)
-        view.wantsLayer = true
-        view.layer?.isOpaque = settings.opacity >= 1.0
+        view.nativeBackgroundColor = .black
     }
 
     // MARK: LocalProcessTerminalViewDelegate
