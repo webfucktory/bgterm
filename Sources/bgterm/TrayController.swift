@@ -11,7 +11,8 @@ final class TrayController: NSObject {
 
     private var enabled = true
 
-    func install() {
+    func install(enabled: Bool = true) {
+        self.enabled = enabled
         statusItem.button?.title = "▮"
         statusItem.button?.toolTip = "bgterm"
         rebuildMenu()

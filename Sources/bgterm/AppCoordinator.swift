@@ -37,6 +37,11 @@ final class AppCoordinator: NSObject, NSApplicationDelegate {
         installTray()
         installEscMonitor()
 
+        if !settings.enabledOnLaunch {
+            window.orderOut(nil)
+            monitor.stop()
+        }
+
         NotificationCenter.default.addObserver(
             self, selector: #selector(screensChanged),
             name: NSApplication.didChangeScreenParametersNotification, object: nil)
@@ -47,16 +52,16 @@ final class AppCoordinator: NSObject, NSApplicationDelegate {
             guard let self else { return }
             if enabled { self.window.orderFront(nil); self.monitor.start() }
             else { self.window.orderOut(nil); self.monitor.stop() }
+            var s = self.settings!; s.enabledOnLaunch = enabled; self.settings = s
         }
         tray.onSetOpacity = { [weak self] value in
             guard let self else { return }
             var s = self.settings!; s.opacity = value; self.settings = s
             self.surface.apply(s)
-            self.window.invalidateShadow()
         }
         tray.onRestartShell = { [weak self] in self?.surface.start() }
         tray.onQuit = { NSApp.terminate(nil) }
-        tray.install()
+        tray.install(enabled: settings.enabledOnLaunch)
     }
 
     private func installEscMonitor() {
