@@ -44,9 +44,8 @@ final class AppCoordinator: NSObject, NSApplicationDelegate {
         }
         if KeyTap.isTrusted {
             keyTap.start()
-        } else if !UserDefaults.standard.bool(forKey: "didPromptAccessibility") {
-            UserDefaults.standard.set(true, forKey: "didPromptAccessibility")
-            KeyTap.requestAccess()   // prompt at most once, then never nag again
+        } else {
+            KeyTap.requestAccess()   // prompts until granted; stops once trusted
         }
 
         installTray()
