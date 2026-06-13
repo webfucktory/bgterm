@@ -73,13 +73,12 @@ final class TerminalSurface: NSObject, LocalProcessTerminalViewDelegate {
         let size = CGFloat(settings.fontSize)
         view.font = NSFont(name: settings.fontName, size: size)
             ?? .monospacedSystemFont(ofSize: size, weight: .regular)
-        view.nativeForegroundColor = .white
-        view.nativeBackgroundColor = .black
-
         let opacity = CGFloat(settings.opacity)
         let opaque = opacity >= 1.0
+        view.nativeForegroundColor = .white                                   // text always opaque
+        view.nativeBackgroundColor = opaque ? .black : NSColor.black.withAlphaComponent(opacity)
         view.forceOpaque = opaque
-        view.alphaValue = opacity
+        view.alphaValue = 1.0                                                 // never dim the text
         container.layer?.backgroundColor = (opaque ? NSColor.black : NSColor.clear).cgColor
     }
 
