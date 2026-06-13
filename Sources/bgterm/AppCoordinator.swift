@@ -71,17 +71,12 @@ final class AppCoordinator: NSObject, NSApplicationDelegate {
         tray.install(enabled: settings.enabledOnLaunch)
     }
 
-    /// ⌥⌘T: reveal the desktop and focus the terminal, or restore windows and
-    /// release focus if already focused.
+    /// ⌥⌘T: bring the terminal to the front and focus it, or send it back to the
+    /// desktop and release focus if already focused.
     private func toggleViaHotkey() {
         guard focusEnabled else { return }
-        if reveal.state == .focused {
-            reveal.escapePressed()
-            ShowDesktop.toggle()   // restore the windows that were moved aside
-        } else {
-            ShowDesktop.toggle()   // slide windows aside to reveal the desktop
-            reveal.forceFocus()
-        }
+        if reveal.state == .focused { reveal.escapePressed() }
+        else { reveal.forceFocus() }
     }
 
     private func installEscMonitor() {
@@ -90,7 +85,6 @@ final class AppCoordinator: NSObject, NSApplicationDelegate {
 
             if event.keyCode == 53 { // Esc
                 self.reveal.escapePressed()
-                ShowDesktop.toggle()   // restore windows
                 return nil
             }
 
