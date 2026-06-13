@@ -1,0 +1,17 @@
+name: release
+on:
+  push:
+    tags: ['v*']
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build app bundle
+        run: ./Scripts/make-app.sh
+      - name: Zip
+        run: ditto -c -k --keepParent bgterm.app "bgterm-${GITHUB_REF_NAME}.zip"
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: bgterm-*.zip
