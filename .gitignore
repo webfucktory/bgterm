@@ -9,3 +9,6 @@ bgterm.app/
 *.d
 *.swiftdeps
 *.swiftdeps~
+
+# internal planning artifacts (not for public repo)
+docs/superpowers/
