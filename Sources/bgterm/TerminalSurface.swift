@@ -2,11 +2,13 @@ import AppKit
 import SwiftTerm
 import BgtermCore
 
-/// Terminal view that declares itself opaque. SwiftTerm leaves NSView.isOpaque
-/// at its default (false); declaring it opaque keeps the layer-backed content
-/// compositing cleanly in the borderless desktop-level window.
+/// Terminal view whose opacity is controllable. SwiftTerm leaves NSView.isOpaque
+/// at its default (false); declaring it opaque keeps content compositing cleanly
+/// at full opacity, while turning it off lets the wallpaper show through when the
+/// user dials opacity down.
 final class OpaqueTerminalView: LocalProcessTerminalView {
-    override var isOpaque: Bool { true }
+    var forceOpaque = true
+    override var isOpaque: Bool { forceOpaque }
 }
 
 /// Owns the interactive terminal view and applies appearance settings.
@@ -42,7 +44,9 @@ final class TerminalSurface: NSObject, LocalProcessTerminalViewDelegate {
         view.startProcess(
             executable: ShellSession.loginShell(),
             args: [],
-            environment: ShellSession.defaultEnvironment()
+            environment: ShellSession.defaultEnvironment(),
+            execName: ShellSession.loginArgv0(),   // login shell → profile sets PATH
+            currentDirectory: ShellSession.startDirectory()
         )
     }
 
@@ -62,6 +66,12 @@ final class TerminalSurface: NSObject, LocalProcessTerminalViewDelegate {
             ?? .monospacedSystemFont(ofSize: size, weight: .regular)
         view.nativeForegroundColor = .white
         view.nativeBackgroundColor = .black
+
+        let opacity = CGFloat(settings.opacity)
+        let opaque = opacity >= 1.0
+        view.forceOpaque = opaque
+        view.alphaValue = opacity
+        container.layer?.backgroundColor = (opaque ? NSColor.black : NSColor.clear).cgColor
     }
 
     // MARK: LocalProcessTerminalViewDelegate

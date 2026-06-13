@@ -7,9 +7,10 @@ final class HotkeyManager {
     private var handlerRef: EventHandlerRef?
     var onTrigger: (() -> Void)?
 
-    /// Default: Option+Command+T.
+    /// Default: Option+Command+T. `id` must be unique per registered hotkey.
     func register(keyCode: UInt32 = UInt32(kVK_ANSI_T),
-                  modifiers: UInt32 = UInt32(optionKey | cmdKey)) {
+                  modifiers: UInt32 = UInt32(optionKey | cmdKey),
+                  id: UInt32 = 1) {
         var eventType = EventTypeSpec(eventClass: OSType(kEventClassKeyboard),
                                       eventKind: UInt32(kEventHotKeyPressed))
         let selfPtr = Unmanaged.passUnretained(self).toOpaque()
@@ -21,7 +22,7 @@ final class HotkeyManager {
             return noErr
         }, 1, &eventType, selfPtr, &handlerRef)
 
-        let hotKeyID = EventHotKeyID(signature: OSType(0x4247544D /* 'BGTM' */), id: 1)
+        let hotKeyID = EventHotKeyID(signature: OSType(0x4247544D /* 'BGTM' */), id: id)
         RegisterEventHotKey(keyCode, modifiers, hotKeyID,
                             GetApplicationEventTarget(), 0, &hotKeyRef)
     }

@@ -8,6 +8,7 @@ final class AppCoordinator: NSObject, NSApplicationDelegate {
     private var surface: TerminalSurface!
     private var reveal: RevealController!
     private var hotkey: HotkeyManager!
+    private var hotkeyF11: HotkeyManager!
     private let tray = TrayController()
     private var escMonitor: Any?
     private var focusEnabled = true
@@ -25,6 +26,7 @@ final class AppCoordinator: NSObject, NSApplicationDelegate {
         surface.apply(settings)
         window.contentView = surface.container
         window.initialFirstResponder = surface.view
+        applyWindowOpacity(settings)
         window.moveToDesktopLevel()
         window.orderFront(nil)
         surface.start()
@@ -34,6 +36,12 @@ final class AppCoordinator: NSObject, NSApplicationDelegate {
         hotkey = HotkeyManager()
         hotkey.onTrigger = { [weak self] in self?.toggleViaHotkey() }
         hotkey.register()
+
+        // F11 also triggers the toggle (registering it pre-empts the system
+        // Show Desktop binding while bgterm runs).
+        hotkeyF11 = HotkeyManager()
+        hotkeyF11.onTrigger = { [weak self] in self?.toggleViaHotkey() }
+        hotkeyF11.register(keyCode: 0x67 /* F11 */, modifiers: 0, id: 2)
 
         installTray()
         installEscMonitor()
@@ -64,6 +72,7 @@ final class AppCoordinator: NSObject, NSApplicationDelegate {
             guard let self else { return }
             var s = self.settings!; s.opacity = value; self.settings = s
             self.surface.apply(s)
+            self.applyWindowOpacity(s)
         }
         tray.onRestartShell = { [weak self] in self?.surface.restart() }
         tray.onQuit = { NSApp.terminate(nil) }
@@ -93,6 +102,14 @@ final class AppCoordinator: NSObject, NSApplicationDelegate {
             }
             return event
         }
+    }
+
+    /// The window must be non-opaque/clear for the wallpaper to show through when
+    /// opacity is below 1; opaque black otherwise.
+    private func applyWindowOpacity(_ settings: Settings) {
+        let opaque = settings.opacity >= 1.0
+        window.isOpaque = opaque
+        window.backgroundColor = opaque ? .black : .clear
     }
 
     @objc private func screensChanged() {
