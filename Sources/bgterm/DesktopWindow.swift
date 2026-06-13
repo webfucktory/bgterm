@@ -44,10 +44,10 @@ final class DesktopWindow: NSWindow {
     }
 
     func raiseAndFocus() {
-        // Come to the front as a normal key window so the terminal is visible and
-        // accepts input regardless of what's on screen. Does NOT touch macOS Show
-        // Desktop, so it can't toggle an already-exposed desktop closed.
-        level = .normal
+        // Stay at desktop level (behind icons and windows) but become the key
+        // window so it receives keyboard input. Never raised above other windows;
+        // never touches macOS Show Desktop.
+        level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.desktopWindow)))
         ignoresMouseEvents = false
         NSApp.activate(ignoringOtherApps: true)
         makeKeyAndOrderFront(nil)
