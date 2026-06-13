@@ -8,7 +8,7 @@ final class AppCoordinator: NSObject, NSApplicationDelegate {
     private var tabs: TerminalTabs!
     private var reveal: RevealController!
     private var hotkey: HotkeyManager!
-    private var hotkeyF11: HotkeyManager!
+    private let keyTap = KeyTap()
     private let tray = TrayController()
     private var escMonitor: Any?
     private var focusEnabled = true
@@ -36,11 +36,14 @@ final class AppCoordinator: NSObject, NSApplicationDelegate {
         hotkey.onTrigger = { [weak self] in self?.toggleViaHotkey() }
         hotkey.register()
 
-        // F11 also triggers the toggle (registering it pre-empts the system
-        // Show Desktop binding while bgterm runs).
-        hotkeyF11 = HotkeyManager()
-        hotkeyF11.onTrigger = { [weak self] in self?.toggleViaHotkey() }
-        hotkeyF11.register(keyCode: 0x67 /* F11 */, modifiers: 0, id: 2)
+        // F11 is reserved by macOS Show Desktop and can't be taken by the hotkey
+        // API, so observe it via an event tap (needs Accessibility). macOS still
+        // performs the Show Desktop; we only sync focus. Prompt for access here.
+        keyTap.onKeyDown = { [weak self] code in
+            if code == 0x67 { self?.f11Pressed() }   // F11
+        }
+        KeyTap.requestAccess()
+        keyTap.start()
 
         installTray()
         installEscMonitor()
@@ -53,6 +56,12 @@ final class AppCoordinator: NSObject, NSApplicationDelegate {
         NotificationCenter.default.addObserver(
             self, selector: #selector(screensChanged),
             name: NSApplication.didChangeScreenParametersNotification, object: nil)
+
+        // Re-arm the F11 event tap whenever the app activates (a freshly-trusted
+        // process only delivers tap events after its first activation).
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main
+        ) { [weak self] _ in self?.keyTap.start() }
     }
 
     private func installTray() {
@@ -76,6 +85,12 @@ final class AppCoordinator: NSObject, NSApplicationDelegate {
         tray.onRestartShell = { [weak self] in self?.tabs.restartActive() }
         tray.onQuit = { NSApp.terminate(nil) }
         tray.install(enabled: settings.enabledOnLaunch)
+    }
+
+    /// F11: macOS performs Show Desktop itself; we only sync the terminal focus.
+    private func f11Pressed() {
+        guard focusEnabled else { return }
+        if reveal.state == .focused { reveal.escapePressed() } else { reveal.forceFocus() }
     }
 
     /// ⌥⌘T: reveal the desktop and focus the terminal, or restore windows and
