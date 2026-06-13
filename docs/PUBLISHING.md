@@ -67,6 +67,14 @@ submit … --wait` and `xcrun stapler staple bgterm.app` before zipping.)
 
 Release flow: `git tag v0.1.0 && git push origin v0.1.0` → workflow publishes the zip.
 
+> Note: pushing `.github/workflows/*` requires a token with the `workflow` scope
+> (`gh auth refresh -h github.com -s workflow`). Until that scope is granted, the
+> workflow file is kept locally and releases are cut by hand: build with
+> `./Scripts/make-app.sh`, zip with `ditto`, then `gh release create vX.Y.Z bgterm-vX.Y.Z.zip`.
+> If you re-upload an asset under the same name, delete the old asset object first
+> (`gh api -X DELETE repos/<owner>/<repo>/releases/assets/<id>`) rather than
+> `--clobber`, to avoid the download CDN serving a stale cached copy.
+
 ## Homebrew Cask
 
 Host a tap repo `webfucktory/homebrew-tap` with `Casks/bgterm.rb`:
@@ -90,7 +98,7 @@ cask "bgterm" do
   end
 
   zap trash: [
-    "~/Library/Preferences/io.goappo.bgterm.plist",
+    "~/Library/Preferences/com.webfucktory.bgterm.plist",
   ]
 end
 ```
@@ -99,6 +107,7 @@ Then end users:
 
 ```bash
 brew tap webfucktory/tap
+brew trust webfucktory/tap      # recent Homebrew requires trusting third-party taps
 brew install --cask bgterm
 ```
 
