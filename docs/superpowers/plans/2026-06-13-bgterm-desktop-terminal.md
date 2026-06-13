@@ -1,10 +1,10 @@
-# tasb — Desktop Terminal Wallpaper Implementation Plan
+# bgterm — Desktop Terminal Wallpaper Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build a tray-only macOS app that renders an interactive shell as the desktop wallpaper (behind icons) and grants it keyboard focus when the desktop is revealed, with a hotkey fallback.
 
-**Architecture:** A Swift Package with two app targets and one test target. Pure, testable logic (the reveal state machine and settings) lives in a `TasbCore` library exercised by unit tests. AppKit/SwiftTerm wiring (desktop-level window, terminal view, tray, window-list polling, Carbon hotkey) lives in the `tasb` executable and is verified by build + a documented manual checklist. The app runs as an accessory (`NSApp.setActivationPolicy(.accessory)`), so no Dock icon.
+**Architecture:** A Swift Package with two app targets and one test target. Pure, testable logic (the reveal state machine and settings) lives in a `BgtermCore` library exercised by unit tests. AppKit/SwiftTerm wiring (desktop-level window, terminal view, tray, window-list polling, Carbon hotkey) lives in the `bgterm` executable and is verified by build + a documented manual checklist. The app runs as an accessory (`NSApp.setActivationPolicy(.accessory)`), so no Dock icon.
 
 **Tech Stack:** Swift 5.9+, AppKit, [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm) (pinned), Carbon `RegisterEventHotKey`, `CGWindowListCopyWindowInfo`, `UserDefaults`. Built and tested with Swift Package Manager (`swift build` / `swift test`).
 
@@ -15,10 +15,10 @@
 ```
 Package.swift
 Sources/
-  TasbCore/                      # pure, unit-tested logic (no AppKit UI)
+  BgtermCore/                      # pure, unit-tested logic (no AppKit UI)
     Settings.swift               # UserDefaults-backed config model
     RevealController.swift       # Wallpaper <-> Focused state machine + protocols
-  tasb/                          # executable: AppKit + SwiftTerm wiring
+  bgterm/                          # executable: AppKit + SwiftTerm wiring
     main.swift                   # entry point, activation policy, app lifecycle
     AppCoordinator.swift         # wires components together
     DesktopWindow.swift          # NSWindow subclass pinned at desktop level
@@ -29,18 +29,18 @@ Sources/
     TrayController.swift         # NSStatusItem menu
     WindowController.swift       # concrete WindowControlling over DesktopWindow
 Tests/
-  TasbCoreTests/
+  BgtermCoreTests/
     SettingsTests.swift
     RevealControllerTests.swift
-  tasbTests/
+  bgtermTests/
     ShellSessionTests.swift      # headless terminal I/O smoke test
 Resources/
   Info.plist                     # LSUIElement bundle metadata (for packaging)
 Scripts/
-  make-app.sh                    # assemble tasb.app bundle around the binary
+  make-app.sh                    # assemble bgterm.app bundle around the binary
 ```
 
-**Responsibility boundaries:** `TasbCore` knows nothing about AppKit windows — it manipulates focus through the `WindowControlling` protocol and reads desktop visibility through an injected closure, which is what makes it unit-testable. The executable supplies the concrete implementations.
+**Responsibility boundaries:** `BgtermCore` knows nothing about AppKit windows — it manipulates focus through the `WindowControlling` protocol and reads desktop visibility through an injected closure, which is what makes it unit-testable. The executable supplies the concrete implementations.
 
 ---
 
@@ -48,9 +48,9 @@ Scripts/
 
 **Files:**
 - Create: `Package.swift`
-- Create: `Sources/TasbCore/Settings.swift` (stub)
-- Create: `Sources/tasb/main.swift` (stub)
-- Create: `Tests/TasbCoreTests/SmokeTest.swift`
+- Create: `Sources/BgtermCore/Settings.swift` (stub)
+- Create: `Sources/bgterm/main.swift` (stub)
+- Create: `Tests/BgtermCoreTests/SmokeTest.swift`
 
 - [ ] **Step 1: Write `Package.swift`**
 
@@ -59,23 +59,23 @@ Scripts/
 import PackageDescription
 
 let package = Package(
-    name: "tasb",
+    name: "bgterm",
     platforms: [.macOS(.v13)],
     dependencies: [
         .package(url: "https://github.com/migueldeicaza/SwiftTerm.git", from: "1.2.0")
     ],
     targets: [
-        .target(name: "TasbCore"),
+        .target(name: "BgtermCore"),
         .executableTarget(
-            name: "tasb",
+            name: "bgterm",
             dependencies: [
-                "TasbCore",
+                "BgtermCore",
                 .product(name: "SwiftTerm", package: "SwiftTerm")
             ]
         ),
-        .testTarget(name: "TasbCoreTests", dependencies: ["TasbCore"]),
+        .testTarget(name: "BgtermCoreTests", dependencies: ["BgtermCore"]),
         .testTarget(
-            name: "tasbTests",
+            name: "bgtermTests",
             dependencies: [
                 .product(name: "SwiftTerm", package: "SwiftTerm")
             ]
@@ -86,30 +86,30 @@ let package = Package(
 
 - [ ] **Step 2: Write stub sources so the package compiles**
 
-`Sources/TasbCore/Settings.swift`:
+`Sources/BgtermCore/Settings.swift`:
 ```swift
-public enum TasbCore {
+public enum BgtermCore {
     public static let version = "0.1.0"
 }
 ```
 
-`Sources/tasb/main.swift`:
+`Sources/bgterm/main.swift`:
 ```swift
-import TasbCore
+import BgtermCore
 
-print("tasb \(TasbCore.version)")
+print("bgterm \(BgtermCore.version)")
 ```
 
 - [ ] **Step 3: Write the toolchain smoke test**
 
-`Tests/TasbCoreTests/SmokeTest.swift`:
+`Tests/BgtermCoreTests/SmokeTest.swift`:
 ```swift
 import XCTest
-@testable import TasbCore
+@testable import BgtermCore
 
 final class SmokeTest: XCTestCase {
     func testVersionExists() {
-        XCTAssertEqual(TasbCore.version, "0.1.0")
+        XCTAssertEqual(BgtermCore.version, "0.1.0")
     }
 }
 ```
@@ -123,7 +123,7 @@ Expected: package resolves SwiftTerm, builds, and `testVersionExists` PASSes.
 
 ```bash
 git add Package.swift Sources Tests
-git commit -m "chore: scaffold tasb swift package with SwiftTerm dependency"
+git commit -m "chore: scaffold bgterm swift package with SwiftTerm dependency"
 ```
 
 ---
@@ -133,15 +133,15 @@ git commit -m "chore: scaffold tasb swift package with SwiftTerm dependency"
 A value type holding user config, persisted through an injectable `KeyValueStore` so tests don't touch the real `UserDefaults`.
 
 **Files:**
-- Modify: `Sources/TasbCore/Settings.swift`
-- Test: `Tests/TasbCoreTests/SettingsTests.swift`
+- Modify: `Sources/BgtermCore/Settings.swift`
+- Test: `Tests/BgtermCoreTests/SettingsTests.swift`
 
 - [ ] **Step 1: Write the failing test**
 
-`Tests/TasbCoreTests/SettingsTests.swift`:
+`Tests/BgtermCoreTests/SettingsTests.swift`:
 ```swift
 import XCTest
-@testable import TasbCore
+@testable import BgtermCore
 
 final class SettingsTests: XCTestCase {
     func testDefaults() {
@@ -190,11 +190,11 @@ Expected: FAIL — `Settings`, `KeyValueStore` not defined.
 
 - [ ] **Step 3: Implement `Settings` and `KeyValueStore`**
 
-Replace `Sources/TasbCore/Settings.swift`:
+Replace `Sources/BgtermCore/Settings.swift`:
 ```swift
 import Foundation
 
-public enum TasbCore {
+public enum BgtermCore {
     public static let version = "0.1.0"
 }
 
@@ -244,7 +244,7 @@ Expected: PASS (all three cases).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add Sources/TasbCore/Settings.swift Tests/TasbCoreTests/SettingsTests.swift
+git add Sources/BgtermCore/Settings.swift Tests/BgtermCoreTests/SettingsTests.swift
 git commit -m "feat: add UserDefaults-backed Settings with injectable store"
 ```
 
@@ -255,15 +255,15 @@ git commit -m "feat: add UserDefaults-backed Settings with injectable store"
 Pure logic for the Wallpaper ⇄ Focused transition. It does not touch AppKit directly; it drives a `WindowControlling` protocol and is fed desktop-visibility samples and explicit events.
 
 **Files:**
-- Create: `Sources/TasbCore/RevealController.swift`
-- Test: `Tests/TasbCoreTests/RevealControllerTests.swift`
+- Create: `Sources/BgtermCore/RevealController.swift`
+- Test: `Tests/BgtermCoreTests/RevealControllerTests.swift`
 
 - [ ] **Step 1: Write the failing test**
 
-`Tests/TasbCoreTests/RevealControllerTests.swift`:
+`Tests/BgtermCoreTests/RevealControllerTests.swift`:
 ```swift
 import XCTest
-@testable import TasbCore
+@testable import BgtermCore
 
 final class FakeWindow: WindowControlling {
     private(set) var focused = false
@@ -352,7 +352,7 @@ Expected: FAIL — `RevealController`, `WindowControlling` not defined.
 
 - [ ] **Step 3: Implement the state machine**
 
-`Sources/TasbCore/RevealController.swift`:
+`Sources/BgtermCore/RevealController.swift`:
 ```swift
 import Foundation
 
@@ -423,7 +423,7 @@ Expected: PASS (all eight cases).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add Sources/TasbCore/RevealController.swift Tests/TasbCoreTests/RevealControllerTests.swift
+git add Sources/BgtermCore/RevealController.swift Tests/BgtermCoreTests/RevealControllerTests.swift
 git commit -m "feat: add RevealController focus state machine with debounce"
 ```
 
@@ -434,12 +434,12 @@ git commit -m "feat: add RevealController focus state machine with debounce"
 Verify a PTY-backed shell actually produces output, using SwiftTerm's `HeadlessTerminal` (no window required).
 
 **Files:**
-- Create: `Sources/tasb/ShellSession.swift`
-- Test: `Tests/tasbTests/ShellSessionTests.swift`
+- Create: `Sources/bgterm/ShellSession.swift`
+- Test: `Tests/bgtermTests/ShellSessionTests.swift`
 
 - [ ] **Step 1: Write the failing test**
 
-`Tests/tasbTests/ShellSessionTests.swift`:
+`Tests/bgtermTests/ShellSessionTests.swift`:
 ```swift
 import XCTest
 import SwiftTerm
@@ -450,14 +450,14 @@ final class ShellSessionTests: XCTestCase {
         let headless = HeadlessTerminal(options: TerminalOptions(cols: 80, rows: 24)) { _ in
             exited.fulfill()
         }
-        headless.process.startProcess(executable: "/bin/echo", args: ["tasb-ok"])
+        headless.process.startProcess(executable: "/bin/echo", args: ["bgterm-ok"])
         wait(for: [exited], timeout: 10)
 
         let terminal = headless.terminal
         var found = false
         for row in 0..<terminal.rows {
             if let line = terminal.getLine(row: row)?.translateToString(trimRight: true),
-               line.contains("tasb-ok") {
+               line.contains("bgterm-ok") {
                 found = true
                 break
             }
@@ -476,7 +476,7 @@ Expected: compiles against SwiftTerm; FAILs only if the buffer read is wrong —
 
 - [ ] **Step 3: Add the production `ShellSession` wrapper**
 
-`Sources/tasb/ShellSession.swift`:
+`Sources/bgterm/ShellSession.swift`:
 ```swift
 import Foundation
 import SwiftTerm
@@ -491,7 +491,7 @@ enum ShellSession {
 
     static func defaultEnvironment() -> [String] {
         var env = Terminal.getEnvironmentVariables(termName: "xterm-256color")
-        env.append("TASB=1")
+        env.append("BGTERM=1")
         return env
     }
 }
@@ -505,7 +505,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add Sources/tasb/ShellSession.swift Tests/tasbTests/ShellSessionTests.swift
+git add Sources/bgterm/ShellSession.swift Tests/bgtermTests/ShellSessionTests.swift
 git commit -m "test: headless PTY echo smoke test + ShellSession helper"
 ```
 
@@ -516,11 +516,11 @@ git commit -m "test: headless PTY echo smoke test + ShellSession helper"
 An `NSWindow` subclass that can sit at desktop level and can also become key when raised.
 
 **Files:**
-- Create: `Sources/tasb/DesktopWindow.swift`
+- Create: `Sources/bgterm/DesktopWindow.swift`
 
 - [ ] **Step 1: Implement the window**
 
-`Sources/tasb/DesktopWindow.swift`:
+`Sources/bgterm/DesktopWindow.swift`:
 ```swift
 import AppKit
 
@@ -570,7 +570,7 @@ Expected: compiles clean.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add Sources/tasb/DesktopWindow.swift
+git add Sources/bgterm/DesktopWindow.swift
 git commit -m "feat: DesktopWindow pinned at desktop level, focusable on raise"
 ```
 
@@ -581,15 +581,15 @@ git commit -m "feat: DesktopWindow pinned at desktop level, focusable on raise"
 Host the live terminal view and apply settings (font, colors, opacity).
 
 **Files:**
-- Create: `Sources/tasb/TerminalSurface.swift`
+- Create: `Sources/bgterm/TerminalSurface.swift`
 
 - [ ] **Step 1: Implement the surface**
 
-`Sources/tasb/TerminalSurface.swift`:
+`Sources/bgterm/TerminalSurface.swift`:
 ```swift
 import AppKit
 import SwiftTerm
-import TasbCore
+import BgtermCore
 
 /// Owns the interactive terminal view and applies appearance settings.
 final class TerminalSurface: NSObject, LocalProcessTerminalViewDelegate {
@@ -642,7 +642,7 @@ Expected: compiles clean.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add Sources/tasb/TerminalSurface.swift
+git add Sources/bgterm/TerminalSurface.swift
 git commit -m "feat: TerminalSurface hosting SwiftTerm view with settings"
 ```
 
@@ -653,11 +653,11 @@ git commit -m "feat: TerminalSurface hosting SwiftTerm view with settings"
 Poll the on-screen window list and report whether the desktop looks revealed (no normal-layer app windows covering the main screen).
 
 **Files:**
-- Create: `Sources/tasb/DesktopVisibilityMonitor.swift`
+- Create: `Sources/bgterm/DesktopVisibilityMonitor.swift`
 
 - [ ] **Step 1: Implement the monitor**
 
-`Sources/tasb/DesktopVisibilityMonitor.swift`:
+`Sources/bgterm/DesktopVisibilityMonitor.swift`:
 ```swift
 import AppKit
 
@@ -711,7 +711,7 @@ Expected: compiles clean.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add Sources/tasb/DesktopVisibilityMonitor.swift
+git add Sources/bgterm/DesktopVisibilityMonitor.swift
 git commit -m "feat: DesktopVisibilityMonitor polling CGWindowList"
 ```
 
@@ -722,11 +722,11 @@ git commit -m "feat: DesktopVisibilityMonitor polling CGWindowList"
 Register a global hotkey (default ⌥⌘T) that forces focus, needing no special permissions.
 
 **Files:**
-- Create: `Sources/tasb/HotkeyManager.swift`
+- Create: `Sources/bgterm/HotkeyManager.swift`
 
 - [ ] **Step 1: Implement the manager**
 
-`Sources/tasb/HotkeyManager.swift`:
+`Sources/bgterm/HotkeyManager.swift`:
 ```swift
 import AppKit
 import Carbon.HIToolbox
@@ -751,7 +751,7 @@ final class HotkeyManager {
             return noErr
         }, 1, &eventType, selfPtr, &handlerRef)
 
-        let hotKeyID = EventHotKeyID(signature: OSType(0x54415342 /* 'TASB' */), id: 1)
+        let hotKeyID = EventHotKeyID(signature: OSType(0x4247544D /* 'BGTM' */), id: 1)
         RegisterEventHotKey(keyCode, modifiers, hotKeyID,
                             GetApplicationEventTarget(), 0, &hotKeyRef)
     }
@@ -773,7 +773,7 @@ Expected: compiles clean.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add Sources/tasb/HotkeyManager.swift
+git add Sources/bgterm/HotkeyManager.swift
 git commit -m "feat: HotkeyManager global hotkey fallback via Carbon"
 ```
 
@@ -784,14 +784,14 @@ git commit -m "feat: HotkeyManager global hotkey fallback via Carbon"
 Bridge `RevealController`'s protocol to the real `DesktopWindow`.
 
 **Files:**
-- Create: `Sources/tasb/WindowController.swift`
+- Create: `Sources/bgterm/WindowController.swift`
 
 - [ ] **Step 1: Implement the bridge**
 
-`Sources/tasb/WindowController.swift`:
+`Sources/bgterm/WindowController.swift`:
 ```swift
 import AppKit
-import TasbCore
+import BgtermCore
 
 /// Adapts a DesktopWindow to the WindowControlling protocol used by RevealController.
 final class WindowController: WindowControlling {
@@ -819,7 +819,7 @@ Expected: compiles clean.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add Sources/tasb/WindowController.swift
+git add Sources/bgterm/WindowController.swift
 git commit -m "feat: WindowController bridging RevealController to DesktopWindow"
 ```
 
@@ -830,11 +830,11 @@ git commit -m "feat: WindowController bridging RevealController to DesktopWindow
 The `NSStatusItem` menu: enable/disable, opacity, font size, restart shell, quit.
 
 **Files:**
-- Create: `Sources/tasb/TrayController.swift`
+- Create: `Sources/bgterm/TrayController.swift`
 
 - [ ] **Step 1: Implement the tray**
 
-`Sources/tasb/TrayController.swift`:
+`Sources/bgterm/TrayController.swift`:
 ```swift
 import AppKit
 
@@ -851,13 +851,13 @@ final class TrayController: NSObject {
 
     func install() {
         statusItem.button?.title = "▮"
-        statusItem.button?.toolTip = "tasb"
+        statusItem.button?.toolTip = "bgterm"
         rebuildMenu()
     }
 
     func showError(_ message: String) {
         statusItem.button?.title = "⚠"
-        statusItem.button?.toolTip = "tasb: \(message)"
+        statusItem.button?.toolTip = "bgterm: \(message)"
     }
 
     private func rebuildMenu() {
@@ -879,7 +879,7 @@ final class TrayController: NSObject {
         restart.target = self
         menu.addItem(restart)
 
-        let quit = NSMenuItem(title: "Quit tasb", action: #selector(quit), keyEquivalent: "q")
+        let quit = NSMenuItem(title: "Quit bgterm", action: #selector(quit), keyEquivalent: "q")
         quit.target = self
         menu.addItem(quit)
 
@@ -917,7 +917,7 @@ Expected: compiles clean.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add Sources/tasb/TrayController.swift
+git add Sources/bgterm/TrayController.swift
 git commit -m "feat: TrayController status-item menu"
 ```
 
@@ -928,15 +928,15 @@ git commit -m "feat: TrayController status-item menu"
 Wire everything: build the window on the main screen, host the terminal, start the monitor/hotkey, feed the RevealController, handle Esc and screen changes.
 
 **Files:**
-- Create: `Sources/tasb/AppCoordinator.swift`
-- Modify: `Sources/tasb/main.swift`
+- Create: `Sources/bgterm/AppCoordinator.swift`
+- Modify: `Sources/bgterm/main.swift`
 
 - [ ] **Step 1: Implement the coordinator**
 
-`Sources/tasb/AppCoordinator.swift`:
+`Sources/bgterm/AppCoordinator.swift`:
 ```swift
 import AppKit
-import TasbCore
+import BgtermCore
 
 final class AppCoordinator: NSObject, NSApplicationDelegate {
     private let defaults = UserDefaultsStore()
@@ -1025,7 +1025,7 @@ final class UserDefaultsStore: KeyValueStore {
 
 - [ ] **Step 2: Rewrite the entry point**
 
-`Sources/tasb/main.swift`:
+`Sources/bgterm/main.swift`:
 ```swift
 import AppKit
 
@@ -1038,18 +1038,18 @@ app.run()
 
 - [ ] **Step 3: Build and run**
 
-Run: `swift build && swift run tasb`
+Run: `swift build && swift run bgterm`
 Expected: a menu-bar item appears; a terminal renders behind the desktop icons; moving real windows away (Show Desktop) gives it keyboard focus within ~0.5 s; Esc returns it; ⌥⌘T forces focus. Quit from the tray menu.
 
 - [ ] **Step 4: Run the full test suite**
 
 Run: `swift test`
-Expected: all `TasbCore` and `tasb` tests PASS.
+Expected: all `BgtermCore` and `bgterm` tests PASS.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add Sources/tasb/AppCoordinator.swift Sources/tasb/main.swift
+git add Sources/bgterm/AppCoordinator.swift Sources/bgterm/main.swift
 git commit -m "feat: wire AppCoordinator, monitor, hotkey, tray, esc handling"
 ```
 
@@ -1071,9 +1071,9 @@ Produce a runnable `.app` so the agent runs as a proper background agent, and ex
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleName</key><string>tasb</string>
-    <key>CFBundleIdentifier</key><string>io.goappo.tasb</string>
-    <key>CFBundleExecutable</key><string>tasb</string>
+    <key>CFBundleName</key><string>bgterm</string>
+    <key>CFBundleIdentifier</key><string>io.goappo.bgterm</string>
+    <key>CFBundleExecutable</key><string>bgterm</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleShortVersionString</key><string>0.1.0</string>
     <key>LSMinimumSystemVersion</key><string>13.0</string>
@@ -1091,18 +1091,18 @@ Produce a runnable `.app` so the agent runs as a proper background agent, and ex
 set -euo pipefail
 
 swift build -c release
-APP="tasb.app/Contents"
-rm -rf tasb.app
+APP="bgterm.app/Contents"
+rm -rf bgterm.app
 mkdir -p "$APP/MacOS" "$APP/Resources"
-cp .build/release/tasb "$APP/MacOS/tasb"
+cp .build/release/bgterm "$APP/MacOS/bgterm"
 cp Resources/Info.plist "$APP/Contents/Info.plist" 2>/dev/null || cp Resources/Info.plist "$APP/Info.plist"
-echo "Built tasb.app"
+echo "Built bgterm.app"
 ```
 
 - [ ] **Step 3: Build the bundle**
 
-Run: `chmod +x Scripts/make-app.sh && ./Scripts/make-app.sh && open tasb.app`
-Expected: `tasb.app` launches as a menu-bar agent with no Dock icon.
+Run: `chmod +x Scripts/make-app.sh && ./Scripts/make-app.sh && open bgterm.app`
+Expected: `bgterm.app` launches as a menu-bar agent with no Dock icon.
 
 - [ ] **Step 4: Manual verification checklist**
 

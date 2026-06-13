@@ -1,4 +1,4 @@
-# tasb — Desktop Terminal Wallpaper
+# bgterm — Desktop Terminal Wallpaper
 
 A tray-only macOS app that renders an interactive terminal as the desktop
 background. The terminal lives behind the desktop icons as wallpaper and
