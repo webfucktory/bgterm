@@ -1,0 +1,11 @@
+.build/
+.swiftpm/
+*.xcodeproj
+bgterm.app/
+.DS_Store
+
+# stray compiler artifacts
+*.o
+*.d
+*.swiftdeps
+*.swiftdeps~

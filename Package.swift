@@ -2,23 +2,23 @@
 import PackageDescription
 
 let package = Package(
-    name: "tasb",
+    name: "bgterm",
     platforms: [.macOS(.v13)],
     dependencies: [
         .package(url: "https://github.com/migueldeicaza/SwiftTerm.git", from: "1.2.0")
     ],
     targets: [
-        .target(name: "TasbCore"),
+        .target(name: "BgtermCore"),
         .executableTarget(
-            name: "tasb",
+            name: "bgterm",
             dependencies: [
-                "TasbCore",
+                "BgtermCore",
                 .product(name: "SwiftTerm", package: "SwiftTerm")
             ]
         ),
-        .testTarget(name: "TasbCoreTests", dependencies: ["TasbCore"]),
+        .testTarget(name: "BgtermCoreTests", dependencies: ["BgtermCore"]),
         .testTarget(
-            name: "tasbTests",
+            name: "bgtermTests",
             dependencies: [
                 .product(name: "SwiftTerm", package: "SwiftTerm")
             ]

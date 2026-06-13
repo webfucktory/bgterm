@@ -1,5 +1,5 @@
 import XCTest
-@testable import TasbCore
+@testable import BgtermCore
 
 final class FakeWindow: WindowControlling {
     private(set) var focused = false

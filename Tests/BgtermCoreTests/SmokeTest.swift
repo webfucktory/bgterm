@@ -1,8 +1,8 @@
 import XCTest
-@testable import TasbCore
+@testable import BgtermCore
 
 final class SmokeTest: XCTestCase {
     func testVersionExists() {
-        XCTAssertEqual(TasbCore.version, "0.1.0")
+        XCTAssertEqual(BgtermCore.version, "0.1.0")
     }
 }

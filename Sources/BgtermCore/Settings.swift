@@ -1,6 +1,6 @@
 import Foundation
 
-public enum TasbCore {
+public enum BgtermCore {
     public static let version = "0.1.0"
 }
 

@@ -10,7 +10,7 @@ final class ShellSessionTests: XCTestCase {
         ) { _ in
             sem.signal()
         }
-        headless.process.startProcess(executable: "/bin/echo", args: ["tasb-ok"])
+        headless.process.startProcess(executable: "/bin/echo", args: ["bgterm-ok"])
 
         let result = sem.wait(timeout: .now() + 10)
         XCTAssertEqual(result, .success, "shell process did not exit within timeout")
@@ -22,7 +22,7 @@ final class ShellSessionTests: XCTestCase {
         var found = false
         for row in 0..<terminal.rows {
             if let line = terminal.getLine(row: row)?.translateToString(trimRight: true),
-               line.contains("tasb-ok") {
+               line.contains("bgterm-ok") {
                 found = true
                 break
             }

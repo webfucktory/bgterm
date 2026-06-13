@@ -11,7 +11,7 @@ enum ShellSession {
 
     static func defaultEnvironment() -> [String] {
         var env = Terminal.getEnvironmentVariables(termName: "xterm-256color")
-        env.append("TASB=1")
+        env.append("BGTERM=1")
         return env
     }
 }
