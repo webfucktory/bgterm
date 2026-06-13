@@ -75,16 +75,12 @@ final class TerminalSurface: NSObject, LocalProcessTerminalViewDelegate {
             ?? .monospacedSystemFont(ofSize: size, weight: .regular)
         let opacity = CGFloat(settings.opacity)
         let opaque = opacity >= 1.0
-        let bg = opaque ? NSColor.black : NSColor.black.withAlphaComponent(opacity)
-        view.nativeForegroundColor = .white                                   // text always opaque
-        view.nativeBackgroundColor = bg
+        view.nativeForegroundColor = .white
+        view.nativeBackgroundColor = .black
         view.forceOpaque = opaque
-        view.alphaValue = 1.0                                                 // never dim the text
-        // The nativeBackgroundColor setter doesn't refresh the view's layer, so
-        // set it directly (with alpha) for a translucent background behind opaque text.
-        view.wantsLayer = true
-        view.layer?.isOpaque = opaque
-        view.layer?.backgroundColor = bg.cgColor
+        // SwiftTerm can't make only the background translucent (it draws opaque
+        // cells and drops alpha), so dim the whole terminal view instead.
+        view.alphaValue = opacity
         container.layer?.backgroundColor = (opaque ? NSColor.black : NSColor.clear).cgColor
     }
 
