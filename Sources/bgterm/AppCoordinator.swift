@@ -22,9 +22,10 @@ final class AppCoordinator: NSObject, NSApplicationDelegate {
 
         window = DesktopWindow(screen: screen)
         window.delegate = self
-        surface = TerminalSurface(frame: screen.frame)
+        surface = TerminalSurface(frame: NSRect(origin: .zero, size: window.frame.size))
         surface.apply(settings)
-        window.contentView = surface.view
+        window.contentView = surface.container
+        window.initialFirstResponder = surface.view
         window.moveToDesktopLevel()
         window.orderFront(nil)
         surface.start()
@@ -81,7 +82,7 @@ final class AppCoordinator: NSObject, NSApplicationDelegate {
 
     @objc private func screensChanged() {
         guard let screen = NSScreen.main else { return }
-        window.setFrame(screen.frame, display: true)
+        window.setFrame(DesktopWindow.wallpaperRect(for: screen), display: true)
     }
 }
 
