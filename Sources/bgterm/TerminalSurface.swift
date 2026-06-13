@@ -19,6 +19,9 @@ final class TerminalSurface: NSObject, LocalProcessTerminalViewDelegate {
     let container: NSView
     let view: OpaqueTerminalView
 
+    /// Set when the tab is being closed, so the shell isn't auto-respawned.
+    private var closing = false
+
     /// Padding between the screen edges and the terminal text.
     private let inset = NSEdgeInsets(top: 28, left: 32, bottom: 28, right: 32)
 
@@ -50,6 +53,12 @@ final class TerminalSurface: NSObject, LocalProcessTerminalViewDelegate {
         )
     }
 
+    /// Permanently stop this surface's shell (no respawn) — used when closing a tab.
+    func terminate() {
+        closing = true
+        if view.process.running { view.process.terminate() }
+    }
+
     func restart() {
         if view.process.running {
             // terminate() sends SIGTERM and calls childStopped(); the processTerminated
@@ -79,6 +88,7 @@ final class TerminalSurface: NSObject, LocalProcessTerminalViewDelegate {
     func setTerminalTitle(source: LocalProcessTerminalView, title: String) {}
     func hostCurrentDirectoryUpdate(source: TerminalView, directory: String?) {}
     func processTerminated(source: TerminalView, exitCode: Int32?) {
+        guard !closing else { return }   // closed tab: don't respawn
         // Re-spawn the shell so the wallpaper terminal is never dead.
         DispatchQueue.main.async { [weak self] in self?.start() }
     }

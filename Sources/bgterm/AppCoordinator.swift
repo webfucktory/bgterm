@@ -5,7 +5,7 @@ final class AppCoordinator: NSObject, NSApplicationDelegate {
     private let defaults = UserDefaultsStore()
     private var settings: Settings!
     private var window: DesktopWindow!
-    private var surface: TerminalSurface!
+    private var tabs: TerminalTabs!
     private var reveal: RevealController!
     private var hotkey: HotkeyManager!
     private var hotkeyF11: HotkeyManager!
@@ -22,16 +22,15 @@ final class AppCoordinator: NSObject, NSApplicationDelegate {
         }
 
         window = DesktopWindow(screen: screen)
-        surface = TerminalSurface(frame: NSRect(origin: .zero, size: window.frame.size))
-        surface.apply(settings)
-        window.contentView = surface.container
-        window.initialFirstResponder = surface.view
+        tabs = TerminalTabs(frame: NSRect(origin: .zero, size: window.frame.size),
+                            settings: { [weak self] in self?.settings ?? Settings(store: UserDefaultsStore()) })
+        window.contentView = tabs.root
+        window.initialFirstResponder = tabs.activeView
         applyWindowOpacity(settings)
         window.moveToDesktopLevel()
         window.orderFront(nil)
-        surface.start()
 
-        reveal = RevealController(window: WindowController(window: window, focusView: surface.view))
+        reveal = RevealController(window: WindowController(window: window, focusView: { [weak self] in self?.tabs.activeView }))
 
         hotkey = HotkeyManager()
         hotkey.onTrigger = { [weak self] in self?.toggleViaHotkey() }
@@ -71,10 +70,10 @@ final class AppCoordinator: NSObject, NSApplicationDelegate {
         tray.onSetOpacity = { [weak self] value in
             guard let self else { return }
             var s = self.settings!; s.opacity = value; self.settings = s
-            self.surface.apply(s)
+            self.tabs.applyAll(s)
             self.applyWindowOpacity(s)
         }
-        tray.onRestartShell = { [weak self] in self?.surface.restart() }
+        tray.onRestartShell = { [weak self] in self?.tabs.restartActive() }
         tray.onQuit = { NSApp.terminate(nil) }
         tray.install(enabled: settings.enabledOnLaunch)
     }
@@ -94,14 +93,35 @@ final class AppCoordinator: NSObject, NSApplicationDelegate {
 
     private func installEscMonitor() {
         escMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard let self else { return event }
-            if event.keyCode == 53, self.reveal.state == .focused { // Esc while focused
+            guard let self, self.reveal.state == .focused else { return event }
+
+            if event.keyCode == 53 { // Esc
                 self.reveal.escapePressed()
                 ShowDesktop.toggle()   // restore windows
                 return nil
             }
+
+            // Tab shortcuts: ⌘ without ⌥ (⌥⌘T is the global reveal hotkey).
+            let mods = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            if mods == .command, let chars = event.charactersIgnoringModifiers {
+                switch chars {
+                case "t":
+                    self.tabs.newTab(); self.focusActiveTab(); return nil
+                case "w":
+                    self.tabs.closeActive(); self.focusActiveTab(); return nil
+                case "1", "2", "3", "4", "5", "6", "7", "8", "9":
+                    if let n = Int(chars) { self.tabs.select(n - 1); self.focusActiveTab() }
+                    return nil
+                default:
+                    break
+                }
+            }
             return event
         }
+    }
+
+    private func focusActiveTab() {
+        if let view = tabs.activeView { window.makeFirstResponder(view) }
     }
 
     /// The window must be non-opaque/clear for the wallpaper to show through when
